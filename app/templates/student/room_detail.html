@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+{% from "components/_macros.html" import csrf_field, empty_state, seat_legend %}
+
+{% block title %}{{ room.name }} · 座位预约 · 校园自习室预约系统{% endblock %}
+
+{% block content %}
+{% set seat_status_labels = {'free': '空闲', 'taken': '已预约', 'mine': '我已预约', 'disabled': '不可用'} %}
+<div class="container">
+  <ul class="breadcrumb" aria-label="面包屑">
+    <li><a href="{{ url_for('student.home') }}">首页</a></li>
+    <li aria-current="page">{{ room.name }}</li>
+  </ul>
+
+  <div class="page-header">
+    <div>
+      <h1 class="page-header__title">{{ room.name }}</h1>
+      <p class="page-header__subtitle">
+        📍 {{ room.location }} · 开放时间 {{ room.opening_display }}–{{ room.closing_display }}
+        {% if room.description %} · {{ room.description }}{% endif %}
+      </p>
+    </div>
+    <div class="page-header__actions">
+      {% if room.is_demo %}<span class="badge badge--demo">示例数据</span>{% endif %}
+      <a class="btn btn--secondary btn--sm" href="{{ url_for('student.home') }}">返回首页</a>
+    </div>
+  </div>
+
+  {% if not room.is_active %}
+  <div class="alert alert--warning" role="alert">
+    <span class="alert__icon" aria-hidden="true">!</span>
+    <span class="alert__text">{{ unavailable_reason or "该自习室已关闭，暂不可预约。" }}</span>
+  </div>
+  {% endif %}
+
+  <section class="card mb-3" aria-labelledby="seatQueryTitle">
+    <div class="card__header">
+      <div>
+        <h2 class="card__title" id="seatQueryTitle">查询座位状态</h2>
+        <p class="card__subtitle">选择预约日期与时间段，查看该时段内座位的占用情况。</p>
+      </div>
+    </div>
+    <form class="filters" id="seatFilterForm" method="get" action="{{ url_for('student.room_detail', room_id=room.id) }}">
+      <div class="filters__group">
+        <label class="filters__label" for="filterDate">预约日期</label>
+        <input class="form-control" type="date" id="filterDate" name="date" data-seat-field="date"
+               value="{{ selected_date.isoformat() }}"
+               {% if date_min %}min="{{ date_min.isoformat() }}"{% endif %}
+               {% if date_max %}max="{{ date_max.isoformat() }}"{% endif %} required>
+      </div>
+      <div class="filters__group">
+        <label class="filters__label" for="filterStart">开始时间</label>
+        <select class="form-select" id="filterStart" name="start" data-seat-field="start">
+          {% for t in start_choices %}<option value="{{ t }}"{% if t == start_time %} selected{% endif %}>{{ t }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="filters__group">
+        <label class="filters__label" for="filterEnd">结束时间</label>
+        <select class="form-select" id="filterEnd" name="end" data-seat-field="end">
+          {% for t in end_choices %}<option value="{{ t }}"{% if t == end_time %} selected{% endif %}>{{ t }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="filters__actions">
+        <button class="btn btn--primary" type="submit">刷新座位状态</button>
+        <a class="btn btn--ghost" href="{{ url_for('student.room_detail', room_id=room.id) }}">重置</a>
+      </div>
+    </form>
+  </section>
+
+  <div class="grid grid--2">
+    <section class="seat-panel" aria-labelledby="seatPanelTitle">
+      <div class="seat-panel__head">
+        <div>
+          <h2 class="card__title" id="seatPanelTitle">座位分布</h2>
+          <p class="muted small">{{ selected_date.isoformat() }} · {{ start_time }}–{{ end_time }} · 点击空闲座位即可选择</p>
+        </div>
+        <div class="seat-counts" aria-label="座位数量统计">
+          <div class="seat-count">
+            <span class="seat-count__value" data-count="free">{{ counts.free }}</span>
+            <span class="seat-count__label">空闲</span>
+          </div>
+          <div class="seat-count">
+            <span class="seat-count__value" data-count="taken">{{ counts.taken }}</span>
+            <span class="seat-count__label">已预约</span>
+          </div>
+          <div class="seat-count">
+            <span class="seat-count__value" data-count="mine">{{ counts.mine }}</span>
+            <span class="seat-count__label">我已预约</span>
+          </div>
+          <div class="seat-count">
+            <span class="seat-count__value" data-count="disabled">{{ counts.disabled }}</span>
+            <span class="seat-count__label">不可用</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card__body">
+        {{ seat_legend() }}
+
+        <div class="seat-filter mt-2" role="group" aria-label="按座位状态筛选">
+          <button type="button" class="seat-filter__btn seat-filter__btn--active" data-status="all" aria-pressed="true">全部</button>
+          <button type="button" class="seat-filter__btn" data-status="free" aria-pressed="false">空闲</button>
+          <button type="button" class="seat-filter__btn" data-status="mine" aria-pressed="false">我已预约</button>
+          <button type="button" class="seat-filter__btn" data-status="taken" aria-pressed="false">已预约</button>
+          <button type="button" class="seat-filter__btn" data-status="disabled" aria-pressed="false">不可用</button>
+        </div>
+
+        <div id="seatStatusMessage" class="muted small mt-2" role="status" aria-live="polite"></div>
+
+        <div class="seat-grid mt-2" id="seatGrid"
+             data-room-id="{{ room.id }}"
+             data-seats-url="{{ url_for('api.room_seats', room_id=room.id) }}">
+          {% for s in seats %}
+          {% set status_label = seat_status_labels.get(s.status, s.status) %}
+          <button type="button"
+                  class="seat seat--{{ s.status }}"
+                  data-seat-id="{{ s.id }}"
+                  data-seat-code="{{ s.seat_code }}"
+                  data-status="{{ s.status }}"
+                  aria-pressed="false"
+                  aria-label="座位 {{ s.seat_code }}，{{ status_label }}"
+                  {% if s.status in ['taken', 'disabled'] %}disabled aria-disabled="true"{% endif %}>
+            <span class="seat__code">{{ s.seat_code }}</span>
+            <span class="seat__note">{{ status_label }}</span>
+          </button>
+          {% else %}
+            {{ empty_state("🪑", "暂无可用座位", "该自习室还没有配置可用座位，请联系管理员。") }}
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
+    <aside class="seat-form-aside">
+      {% if not room.is_active %}
+      <section class="card card--danger">
+        <div class="card__header">
+          <div>
+            <h2 class="card__title">暂不可预约</h2>
+            <p class="card__subtitle">该自习室当前已停用。</p>
+          </div>
+        </div>
+        <div class="card__body">
+          <p class="muted">{{ unavailable_reason or "该自习室已关闭，暂不可预约。" }}</p>
+          <a class="btn btn--secondary btn--block mt-2" href="{{ url_for('student.home') }}">返回首页</a>
+        </div>
+      </section>
+      {% elif current_user.is_authenticated %}
+      <section class="card">
+        <div class="card__header">
+          <div>
+            <h2 class="card__title">提交预约</h2>
+            <p class="card__subtitle">先在左侧座位图中选择座位，再确认日期与时间段。</p>
+          </div>
+        </div>
+        <div class="card__body">
+          <form id="bookingForm" class="form" method="post" action="{{ url_for('student.create_reservation') }}">
+            {{ csrf_field() }}
+            <input type="hidden" name="seat_id" id="seatIdInput" value="">
+
+            <div class="form-group">
+              <label class="form-label" for="bookingRoom">自习室</label>
+              <input class="form-control" type="text" id="bookingRoom" value="{{ room.name }}" readonly>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="bookingDate">预约日期</label>
+              <input class="form-control" type="date" id="bookingDate" name="study_date" data-seat-field="date"
+                     value="{{ selected_date.isoformat() }}"
+                     {% if date_min %}min="{{ date_min.isoformat() }}"{% endif %}
+                     {% if date_max %}max="{{ date_max.isoformat() }}"{% endif %} required>
+            </div>
+
+            <div class="form-grid form-grid--2">
+              <div class="form-group">
+                <label class="form-label" for="bookingStart">开始时间</label>
+                <select class="form-select" id="bookingStart" name="start_time" data-seat-field="start" required>
+                  {% for t in start_choices %}<option value="{{ t }}"{% if t == start_time %} selected{% endif %}>{{ t }}</option>{% endfor %}
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="bookingEnd">结束时间</label>
+                <select class="form-select" id="bookingEnd" name="end_time" data-seat-field="end" required>
+                  {% for t in end_choices %}<option value="{{ t }}"{% if t == end_time %} selected{% endif %}>{{ t }}</option>{% endfor %}
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <span class="form-label">已选座位</span>
+              <div id="selectedSeatLabel" class="form-hint" role="status" aria-live="polite">尚未选择座位，请在左侧座位图中点击空闲座位。</div>
+            </div>
+
+            <button type="submit" class="btn btn--primary btn--block">确认预约</button>
+          </form>
+        </div>
+      </section>
+      {% else %}
+      <section class="card">
+        <div class="card__header">
+          <div>
+            <h2 class="card__title">提交预约</h2>
+            <p class="card__subtitle">登录后即可选择座位并提交预约。</p>
+          </div>
+        </div>
+        <div class="card__body">
+          <div class="alert alert--info">
+            <span class="alert__icon" aria-hidden="true">i</span>
+            <span class="alert__text">当前未登录，登录后才能提交预约；浏览座位状态无需登录。</span>
+          </div>
+          <a class="btn btn--primary btn--block mt-2" href="{{ url_for('auth.login', next=request.path) }}">登录后预约</a>
+          <p class="form-hint text-center mt-2">还没有账号？<a href="{{ url_for('auth.register') }}">立即注册</a></p>
+        </div>
+      </section>
+      {% endif %}
+    </aside>
+  </div>
+
+  <section class="card mt-3">
+    <div class="card__header">
+      <div>
+        <h2 class="card__title">预约规则</h2>
+        <p class="card__subtitle">提交预约前请了解以下规则。</p>
+      </div>
+    </div>
+          <div class="card__body">
+            <ul class="list">
+              <li class="list__item">
+                <div class="list__main">
+                  <p class="list__title">预约窗口</p>
+                  <p class="list__meta">仅支持预约 {% if date_min %}{{ date_min.isoformat() }}{% else %}今天{% endif %} 至 {% if date_max %}{{ date_max.isoformat() }}{% else %}未来 30 天{% endif %} 之间的日期。</p>
+                </div>
+              </li>
+              <li class="list__item">
+                <div class="list__main">
+                  <p class="list__title">开放时间</p>
+                  <p class="list__meta">本自习室开放时间为 {{ room.opening_display }}–{{ room.closing_display }}，结束时间需晚于开始时间。</p>
+                </div>
+              </li>
+              <li class="list__item">
+                <div class="list__main">
+                  <p class="list__title">冲突规则</p>
+                  <p class="list__meta">同一座位的重叠时间段仅允许一个有效预约；同一学生同一时间段不能预约多个座位。</p>
+                </div>
+              </li>
+              <li class="list__item">
+                <div class="list__main">
+                  <p class="list__title">签到与取消</p>
+                  <p class="list__meta">签到窗口为预约开始前 15 分钟至开始后 30 分钟；预约开始后不可取消，已取消的预约会释放座位。</p>
+                </div>
+              </li>
+              {% if demo_mode %}
+              <li class="list__item">
+                <div class="list__main">
+                  <p class="list__title">示例数据说明</p>
+                  <p class="list__meta">本页展示的自习室、座位与预约状态均为本地演示数据，仅用于教学与竞赛展示。</p>
+                </div>
+              </li>
+              {% endif %}
+      </ul>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.PAGE_CONFIG = {
+    roomId: {{ room.id }},
+    seatsUrl: {{ url_for('api.room_seats', room_id=room.id)|tojson }},
+    selectedDate: {{ selected_date.isoformat()|tojson }},
+    startTime: {{ start_time|tojson }},
+    endTime: {{ end_time|tojson }},
+    statusLabels: {{ {'free': '空闲', 'taken': '已预约', 'mine': '我已预约', 'disabled': '不可用'}|tojson }}
+  };
+</script>
+<script src="{{ url_for('static', filename='js/room.js') }}"></script>
+{% endblock %}

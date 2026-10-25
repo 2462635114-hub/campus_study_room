@@ -1,0 +1,1 @@
+# 该目录用于存放本地 SQLite 数据库（开发环境自动创建 campus.db，已被 .gitignore 忽略）。

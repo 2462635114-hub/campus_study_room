@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% from "components/_macros.html" import render_field %}
+
+{% block title %}注册 · 校园自习室预约系统{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+  <div class="container">
+    <div class="auth-layout">
+      <aside class="auth-aside">
+        <h1 class="auth-aside__title">创建你的<br>自习室预约账号</h1>
+        <p class="auth-aside__text">注册后即可浏览自习室、查看座位状态并预约学习座位。</p>
+        <ul class="auth-aside__list">
+          <li>预约未来 30 天内的自习座位</li>
+          <li>在签到窗口内完成签到，避免爽约</li>
+          <li>随时查看、筛选和取消自己的预约</li>
+        </ul>
+        <p class="auth-aside__text small">本系统为教学与竞赛展示项目，注册账号仅用于本地演示。</p>
+      </aside>
+
+      <section class="auth-card" aria-labelledby="registerTitle">
+        <div class="auth-card__head">
+          <h2 class="auth-card__title" id="registerTitle">学生注册</h2>
+          <p class="auth-card__subtitle">填写用户名和密码，创建一个普通学生账号。</p>
+        </div>
+
+        <div class="alert alert--info">
+          <span class="alert__icon" aria-hidden="true">i</span>
+          <span class="alert__text">注册后为普通学生账号；管理员账号由命令行创建，不开放自助注册。</span>
+        </div>
+
+        {% if form.errors %}
+        <div class="alert alert--error" role="alert">
+          <span class="alert__icon" aria-hidden="true">!</span>
+          <span class="alert__text">提交未成功：{% for field_errors in form.errors.values() %}{{ field_errors|join('；') }}{% if not loop.last %}；{% endif %}{% endfor %}</span>
+        </div>
+        {% endif %}
+
+        <form class="form" method="post" action="{{ url_for('auth.register') }}">
+          {{ form.hidden_tag() }}
+          {{ render_field(form.username) }}
+          {% if not form.username.description %}<p class="form-hint">用户名长度为 3–20 位，仅限字母、数字或下划线。</p>{% endif %}
+          {{ render_field(form.password) }}
+          {% if not form.password.description %}<p class="form-hint">密码至少 8 位，建议同时包含字母和数字。</p>{% endif %}
+          {{ render_field(form.confirm_password) }}
+          <button class="btn btn--primary btn--block" type="submit">注册</button>
+        </form>
+
+        <div class="auth-card__footer">
+          <div>已有账号？<a href="{{ url_for('auth.login') }}">去登录</a></div>
+          <div class="small"><a href="{{ url_for('student.home') }}">返回首页</a></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+{% endblock %}

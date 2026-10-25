@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}404 · 页面不存在 · 校园自习室预约系统{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="error-page">
+    <p class="error-page__code" aria-hidden="true">404</p>
+    <h1 class="error-page__title">页面不存在</h1>
+    <p class="error-page__text">你访问的页面可能已被移除、链接地址有误，或你没有查看该页面的权限。</p>
+    <div class="error-page__actions">
+      <a class="btn btn--primary" href="{{ url_for('student.home') }}">返回首页</a>
+      <button class="btn btn--secondary" type="button" onclick="history.back()">返回上一页</button>
+    </div>
+  </div>
+</div>
+{% endblock %}

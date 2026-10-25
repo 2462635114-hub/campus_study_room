@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% from "components/_macros.html" import csrf_field %}
+
+{% block title %}管理后台 · 校园自习室预约系统{% endblock %}
+
+{% block content %}
+{%- set menu_map = {
+  'admin.dashboard': 'dashboard',
+  'admin.rooms': 'rooms',
+  'admin.room_new': 'rooms',
+  'admin.room_edit': 'rooms',
+  'admin.room_seats_page': 'seats',
+  'admin.seat_edit': 'seats',
+  'admin.reservations': 'reservations',
+  'admin.statistics': 'statistics'
+} -%}
+{%- set menu = active_menu if active_menu is defined and active_menu else menu_map.get(request.endpoint, '') -%}
+<div class="admin-layout">
+  <aside class="sidebar" id="adminSidebar" aria-label="管理后台导航">
+    <a class="sidebar__brand" href="{{ url_for('admin.dashboard') }}">
+      <span class="brand__mark" aria-hidden="true">研</span>
+      <span class="brand__text">自习室 · 管理后台</span>
+    </a>
+
+    <nav class="sidebar__nav" aria-label="管理功能导航">
+      <p class="sidebar__section">总览</p>
+      <a class="sidebar__link{% if menu == 'dashboard' %} sidebar__link--active{% endif %}" href="{{ url_for('admin.dashboard') }}"{% if menu == 'dashboard' %} aria-current="page"{% endif %}>
+        <span class="sidebar__icon" aria-hidden="true">📊</span>
+        <span>仪表盘</span>
+      </a>
+
+      <p class="sidebar__section">运营管理</p>
+      <a class="sidebar__link{% if menu in ['rooms', 'seats'] %} sidebar__link--active{% endif %}" href="{{ url_for('admin.rooms') }}"{% if menu in ['rooms', 'seats'] %} aria-current="page"{% endif %}>
+        <span class="sidebar__icon" aria-hidden="true">🏫</span>
+        <span>自习室管理</span>
+      </a>
+      <a class="sidebar__link{% if menu == 'reservations' %} sidebar__link--active{% endif %}" href="{{ url_for('admin.reservations') }}"{% if menu == 'reservations' %} aria-current="page"{% endif %}>
+        <span class="sidebar__icon" aria-hidden="true">🗓️</span>
+        <span>预约管理</span>
+      </a>
+      <a class="sidebar__link{% if menu == 'statistics' %} sidebar__link--active{% endif %}" href="{{ url_for('admin.statistics') }}"{% if menu == 'statistics' %} aria-current="page"{% endif %}>
+        <span class="sidebar__icon" aria-hidden="true">📈</span>
+        <span>统计分析</span>
+      </a>
+    </nav>
+
+    <div class="sidebar__footer">
+      <p class="small">{{ current_user.username }} · {{ current_user.role_label }}</p>
+      <a class="sidebar__link" href="{{ url_for('student.home') }}">
+        <span class="sidebar__icon" aria-hidden="true">↩</span>
+        <span>返回前台</span>
+      </a>
+      <form class="w-100" method="post" action="{{ url_for('auth.logout') }}">
+        {{ csrf_field() }}
+        <button class="btn btn--ghost w-100" type="submit">
+          <span class="sidebar__icon" aria-hidden="true">⏻</span>
+          <span>退出登录</span>
+        </button>
+      </form>
+    </div>
+  </aside>
+
+  <div class="sidebar-backdrop" aria-hidden="true"></div>
+
+  <div class="admin-main">
+    <header class="admin-topbar">
+      <div class="flex flex-center gap-2">
+        <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-controls="adminSidebar" aria-expanded="false">
+          <span aria-hidden="true">☰</span>
+          <span class="sr-only">打开管理菜单</span>
+        </button>
+        <h1 class="admin-topbar__title">{% block admin_title %}管理后台{% endblock %}</h1>
+      </div>
+      <div class="flex flex-center gap-2">
+        {% block admin_actions %}{% endblock %}
+      </div>
+    </header>
+
+    <div class="admin-content">
+      {% block admin_content %}{% endblock %}
+    </div>
+  </div>
+</div>
+{% endblock %}

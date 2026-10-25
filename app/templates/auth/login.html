@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% from "components/_macros.html" import render_field %}
+
+{% block title %}登录 · 校园自习室预约系统{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+  <div class="container">
+    <div class="auth-layout">
+      <aside class="auth-aside">
+        <h1 class="auth-aside__title">校园自习室<br>智能预约与座位管理</h1>
+        <p class="auth-aside__text">一个页面完成自习室浏览、座位状态查询与在线预约，帮助你规划每一段自习时间。</p>
+        <ul class="auth-aside__list">
+          <li>按日期与时间段查看实时座位空闲状态</li>
+          <li>在线预约、签到、取消并查看历史记录</li>
+          <li>学生账号仅能查看和管理自己的预约</li>
+        </ul>
+        {% if demo_mode %}
+        <p class="auth-aside__text small">当前为本地示例数据演示环境，仅用于教学与竞赛展示，不代表真实校园使用情况。</p>
+        {% endif %}
+      </aside>
+
+      <section class="auth-card" aria-labelledby="loginTitle">
+        <div class="auth-card__head">
+          <h2 class="auth-card__title" id="loginTitle">学生登录</h2>
+          <p class="auth-card__subtitle">请输入用户名和密码，登录后可查询座位并提交预约。</p>
+        </div>
+
+        {% if form.errors %}
+        <div class="alert alert--error" role="alert">
+          <span class="alert__icon" aria-hidden="true">!</span>
+          <span class="alert__text">提交未成功：{% for field_errors in form.errors.values() %}{{ field_errors|join('；') }}{% if not loop.last %}；{% endif %}{% endfor %}</span>
+        </div>
+        {% endif %}
+
+        <form class="form" method="post" action="{{ url_for('auth.login', next=request.args.get('next')) }}">
+          {{ form.hidden_tag() }}
+          {{ render_field(form.username) }}
+          {{ render_field(form.password) }}
+          {% if form.remember is defined %}{{ render_field(form.remember) }}{% endif %}
+          <button class="btn btn--primary btn--block" type="submit">登录</button>
+        </form>
+
+        <div class="auth-card__footer">
+          <div>还没有账号？<a href="{{ url_for('auth.register') }}">去注册</a></div>
+          <div class="small"><a href="{{ url_for('student.home') }}">返回首页</a></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+{% endblock %}

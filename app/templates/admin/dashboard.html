@@ -1,0 +1,155 @@
+{% extends "admin/base.html" %}
+{% from "components/_macros.html" import status_badge, empty_state %}
+
+{% block title %}仪表盘 · 校园自习室预约系统{% endblock %}
+{% block admin_title %}仪表盘{% endblock %}
+
+{% block admin_actions %}
+<a class="btn btn--primary btn--sm" href="{{ url_for('admin.room_new') }}">新增自习室</a>
+<a class="btn btn--secondary btn--sm" href="{{ url_for('admin.reservations') }}">预约管理</a>
+<a class="btn btn--secondary btn--sm" href="{{ url_for('admin.statistics') }}">统计分析</a>
+<a class="btn btn--ghost btn--sm" href="{{ url_for('admin.export_reservations') }}">导出 CSV</a>
+{% endblock %}
+
+{% block admin_content %}
+<div class="page-header">
+  <div>
+    <h2 class="page-header__title">欢迎回来，{{ current_user.username }}</h2>
+    <p class="page-header__subtitle">
+      {{ now.year }} 年 {{ now.month }} 月 {{ now.day }} 日 · 星期{{ '一二三四五六日'[now.weekday()] }} · 管理后台数据概览
+      {% if demo_mode %}<span class="badge badge--demo">示例数据</span>{% endif %}
+    </p>
+  </div>
+</div>
+
+<section class="stat-grid" aria-label="管理数据总览">
+  <div class="stat-card">
+    <div class="stat-card__icon" aria-hidden="true">🏫</div>
+    <p class="stat-card__label">自习室总数</p>
+    <p class="stat-card__value">{{ stats.total_rooms }}</p>
+    <p class="stat-card__hint">启用中 {{ stats.active_rooms }} 间 · 已停用 {{ stats.total_rooms - stats.active_rooms }} 间</p>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card__icon" aria-hidden="true">🪑</div>
+    <p class="stat-card__label">座位总数</p>
+    <p class="stat-card__value">{{ stats.total_seats }}</p>
+    <p class="stat-card__hint">全部自习室已启用座位数</p>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card__icon" aria-hidden="true">🗓️</div>
+    <p class="stat-card__label">当日预约</p>
+    <p class="stat-card__value">{{ stats.today_reservations }}</p>
+    <p class="stat-card__hint">今日签到 {{ stats.today_checkins }} 次</p>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card__icon" aria-hidden="true">✅</div>
+    <p class="stat-card__label">当前有效预约</p>
+    <p class="stat-card__value">{{ stats.active_reservations }}</p>
+    <p class="stat-card__hint">今日取消 {{ stats.cancelled_today }} 条</p>
+  </div>
+</section>
+
+<div class="card">
+  <div class="card__header">
+    <div>
+      <h2 class="card__title">最近预约</h2>
+      <p class="card__subtitle">最新 {{ recent_reservations|length }} 条预约记录</p>
+    </div>
+    <a class="btn btn--ghost btn--sm" href="{{ url_for('admin.reservations') }}">查看全部</a>
+  </div>
+  <div class="card__body">
+    {% if recent_reservations %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">学生</th>
+            <th scope="col">自习室 / 座位</th>
+            <th scope="col">日期</th>
+            <th scope="col">时间段</th>
+            <th scope="col">状态</th>
+            <th scope="col">创建时间</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for reservation in recent_reservations %}
+          <tr>
+            <td>{{ reservation.user.username }}</td>
+            <td><strong>{{ reservation.room.name }}</strong> <span class="muted small">/ {{ reservation.seat.seat_code }}</span></td>
+            <td class="nowrap">{{ reservation.date_display }}</td>
+            <td class="nowrap">{{ reservation.time_range_display }}</td>
+            <td>{{ status_badge(reservation.status) }}</td>
+            <td class="nowrap">{{ reservation.created_at.strftime('%Y-%m-%d %H:%M') if reservation.created_at else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      {{ empty_state("🗓️", "暂无预约记录", "学生提交预约后，最新的预约记录会显示在这里。", url_for('admin.reservations'), "前往预约管理") }}
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid grid--2">
+  <div class="card">
+    <div class="card__header">
+      <div>
+        <h2 class="card__title">自习室使用概览</h2>
+        <p class="card__subtitle">今日预约数与座位利用率</p>
+      </div>
+    </div>
+    <div class="card__body">
+      {% if room_usage %}
+      <div class="list">
+        {% for item in room_usage %}
+        {% set raw_pct = item.utilization_pct|default(0)|float %}
+        {% set pct = 0 if raw_pct < 0 else (100 if raw_pct > 100 else raw_pct) %}
+        <div class="list__item">
+          <div class="list__main">
+            <p class="list__title">{{ item.room.name }}</p>
+            <p class="list__meta">
+              {{ item.room.location or '未填写位置' }} · 座位 {{ item.seat_count }} 个 · 今日预约 {{ item.today_reservations }} 条 · 当前有效 {{ item.active_reservations }} 条
+            </p>
+            <div class="progress" role="progressbar" aria-valuenow="{{ pct|round(1) }}" aria-valuemin="0" aria-valuemax="100" aria-label="{{ item.room.name }} 今日座位利用率">
+              <div class="progress__bar" style="width: {{ pct|round(1) }}%"></div>
+            </div>
+          </div>
+          <div class="list__aside">
+            <span class="badge badge--info">{{ pct|round(1) }}%</span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+        {{ empty_state("🏫", "暂无自习室数据", "创建自习室并产生预约后，这里会显示使用概览。", url_for('admin.room_new'), "新增自习室") }}
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card__header">
+      <div>
+        <h2 class="card__title">预约状态分布</h2>
+        <p class="card__subtitle">全部预约记录按状态统计</p>
+      </div>
+    </div>
+    <div class="card__body">
+      {% if status_breakdown %}
+      <div class="list">
+        {% for item in status_breakdown %}
+        <div class="list__item">
+          <div class="list__main">
+            <p class="list__title">{{ status_badge(item.status) }}</p>
+          </div>
+          <div class="list__aside"><strong>{{ item.count }}</strong> <span class="muted small">条</span></div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+        {{ empty_state("🗂️", "暂无预约数据", "产生预约记录后，这里会显示各状态的分布情况。") }}
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "admin/base.html" %}
+{% from "components/_macros.html" import render_field, csrf_field %}
+
+{% set is_edit = (mode == 'edit') %}
+
+{% block title %}{{ '编辑自习室' if is_edit else '新增自习室' }} · 校园自习室预约系统{% endblock %}
+{% block admin_title %}{{ '编辑自习室' if is_edit else '新增自习室' }}{% endblock %}
+
+{% block admin_content %}
+<nav class="breadcrumb" aria-label="面包屑导航">
+  <a href="{{ url_for('admin.dashboard') }}">管理后台</a>
+  <span aria-hidden="true"> / </span>
+  <a href="{{ url_for('admin.rooms') }}">自习室管理</a>
+  <span aria-hidden="true"> / </span>
+  <span aria-current="page">{{ '编辑自习室' if is_edit else '新增自习室' }}</span>
+</nav>
+
+<div class="card">
+  <div class="card__header">
+    <div>
+      <h2 class="card__title">{{ '编辑自习室「' ~ room.name ~ '」' if is_edit else '新增自习室' }}</h2>
+      <p class="card__subtitle">{{ '修改自习室的基础信息与开放状态' if is_edit else '填写自习室的基础信息，创建后可继续添加座位' }}</p>
+    </div>
+  </div>
+  <div class="card__body">
+    {% if is_edit %}
+    <div class="alert alert--info">
+      <span class="alert__icon" aria-hidden="true">i</span>
+      <span class="alert__text">关闭自习室不会删除历史预约记录；修改开放时间仅影响之后的预约校验，已产生的预约保持不变。</span>
+    </div>
+    {% endif %}
+
+    <form class="form" method="post" action="{{ url_for('admin.room_edit', room_id=room.id) if is_edit else url_for('admin.room_new') }}">
+      {{ form.hidden_tag() }}
+
+      <div class="form-grid form-grid--2">
+        {{ render_field(form.name) }}
+        {{ render_field(form.location) }}
+      </div>
+      <div class="form-grid form-grid--2">
+        {{ render_field(form.opening_time) }}
+        {{ render_field(form.closing_time) }}
+      </div>
+      {{ render_field(form.description) }}
+      {{ render_field(form.is_active) }}
+
+      <div class="form-actions">
+        <button class="btn btn--primary" type="submit">{{ '保存修改' if is_edit else '创建自习室' }}</button>
+        <a class="btn btn--ghost" href="{{ url_for('admin.rooms') }}">取消</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

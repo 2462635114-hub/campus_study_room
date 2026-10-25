@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% from "components/_macros.html" import empty_state %}
+
+{% block title %}首页 · 校园自习室预约系统{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <div class="container">
+    <div class="hero__inner">
+      <div class="hero__content">
+        <span class="hero__badge">{% if demo_mode %}示例数据 · 教学与竞赛展示环境{% else %}教学与竞赛展示项目{% endif %}</span>
+        <h1 class="hero__title">找到安静的自习座位，专注每一段学习时间</h1>
+        <p class="hero__subtitle">浏览校园自习室、查看所选时段的座位空闲状态，在线完成预约、签到与取消，一个页面管理你的自习安排。</p>
+        <div class="hero__actions">
+          <a class="btn btn--primary" href="#rooms">开始找座位</a>
+          {% if current_user.is_authenticated %}
+            <a class="btn btn--secondary" href="{{ url_for('student.my_reservations') }}">我的预约</a>
+          {% else %}
+            <a class="btn btn--secondary" href="{{ url_for('auth.login', next=url_for('student.my_reservations')) }}">我的预约</a>
+          {% endif %}
+        </div>
+      </div>
+      <div class="hero__stats">
+        <div class="hero-stat">
+          <span class="hero-stat__value">{{ stats.room_count }}</span>
+          <span class="hero-stat__label">开放自习室</span>
+        </div>
+        <div class="hero-stat">
+          <span class="hero-stat__value">{{ stats.seat_count }}</span>
+          <span class="hero-stat__label">可用座位</span>
+        </div>
+        <div class="hero-stat">
+          <span class="hero-stat__value">{{ stats.today_reservations }}</span>
+          <span class="hero-stat__label">今日预约</span>
+        </div>
+        <div class="hero-stat">
+          <span class="hero-stat__value">{{ stats.active_reservations }}</span>
+          <span class="hero-stat__label">当前有效预约</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="container">
+  <div class="page-header" id="rooms">
+    <div>
+      <h2 class="page-header__title">自习室</h2>
+      <p class="page-header__subtitle">
+        共 {{ rooms|length }} 间开放自习室{% if q %} · 搜索“{{ q }}”{% endif %}{% if selected_date %} · 预约日期 {{ selected_date.isoformat() }}{% endif %}
+      </p>
+    </div>
+    <div class="page-header__actions">
+      {% if current_user.is_authenticated %}
+      <a class="btn btn--secondary btn--sm" href="{{ url_for('student.my_reservations') }}">我的预约</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <section class="card mb-3" aria-labelledby="homeFilterTitle">
+    <div class="card__header">
+      <div>
+        <h2 class="card__title" id="homeFilterTitle">查询自习室</h2>
+        <p class="card__subtitle">按名称或位置搜索，并选择你计划自习的日期。</p>
+      </div>
+    </div>
+    <form class="filters" method="get" action="{{ url_for('student.home') }}">
+      <div class="filters__group">
+        <label class="filters__label" for="homeSearch">搜索自习室</label>
+        <input class="form-control" type="search" id="homeSearch" name="q" value="{{ q or '' }}" placeholder="输入名称或位置，例如：图书馆" maxlength="50" autocomplete="off">
+      </div>
+      <div class="filters__group">
+        <label class="filters__label" for="homeDate">预约日期</label>
+        <input class="form-control" type="date" id="homeDate" name="date"
+               value="{% if selected_date %}{{ selected_date.isoformat() }}{% endif %}"
+               {% if date_min %}min="{{ date_min.isoformat() }}"{% endif %}
+               {% if date_max %}max="{{ date_max.isoformat() }}"{% endif %}>
+      </div>
+      <div class="filters__actions">
+        <button class="btn btn--primary" type="submit">查询</button>
+        <a class="btn btn--ghost" href="{{ url_for('student.home') }}">重置</a>
+      </div>
+    </form>
+  </section>
+
+  {% if room_cards %}
+  <div class="room-grid">
+    {% for card in room_cards %}
+    <article class="room-card">
+      <div class="room-card__head">
+        <h3 class="room-card__title">
+          <a href="{{ url_for('student.room_detail', room_id=card.room.id) }}">{{ card.room.name }}</a>
+        </h3>
+        {% if card.room.is_demo %}<span class="badge badge--demo">示例数据</span>{% endif %}
+      </div>
+      <p class="room-card__location">📍 {{ card.room.location }}</p>
+      {% if card.room.description %}<p class="room-card__desc">{{ card.room.description }}</p>{% endif %}
+      <div class="room-card__meta">
+        <span class="meta-item">
+          <span class="meta-item__label">开放时间</span>
+          <span class="meta-item__value">{{ card.room.opening_display }}–{{ card.room.closing_display }}</span>
+        </span>
+        <span class="meta-item">
+          <span class="meta-item__label">座位数</span>
+          <span class="meta-item__value">{{ card.seat_count }} 个</span>
+        </span>
+        <span class="meta-item">
+          <span class="meta-item__label">预约数</span>
+          <span class="meta-item__value">{{ card.today_reservations }} 次</span>
+        </span>
+        {% if card.free_count is defined and card.free_count is not none %}
+        <span class="meta-item">
+          <span class="meta-item__label">当前空闲</span>
+          <span class="meta-item__value">{{ card.free_count }} 个</span>
+        </span>
+        {% endif %}
+      </div>
+      <div class="room-card__footer">
+        <div>
+          <span class="muted small">利用率 {{ card.utilization_pct }}%</span>
+          <div class="progress" role="img" aria-label="座位利用率 {{ card.utilization_pct }}%">
+            <span class="progress__bar" style="width: {{ card.utilization_pct }}%"></span>
+          </div>
+        </div>
+        {% if selected_date %}
+        <a class="btn btn--primary btn--sm" href="{{ url_for('student.room_detail', room_id=card.room.id, date=selected_date.isoformat()) }}">查看座位</a>
+        {% else %}
+        <a class="btn btn--primary btn--sm" href="{{ url_for('student.room_detail', room_id=card.room.id) }}">查看座位</a>
+        {% endif %}
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+    {% if q %}
+      {{ empty_state("🔍", "没有找到符合条件的自习室", "换个关键词试试，或清空搜索条件查看全部自习室。", url_for('student.home'), "清空搜索") }}
+    {% else %}
+      {{ empty_state("🏫", "暂无开放的自习室", "管理员还没有启用自习室，请稍后再来查看。", url_for('student.home'), "刷新页面") }}
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

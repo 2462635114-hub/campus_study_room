@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{# 注意：宏名 pagination 会遮蔽后端传入的同名 context 变量，故用别名导入；直接写 {{ pagination(pagination) }} 会把宏自身当成参数。 #}
+{% from "components/_macros.html" import csrf_field, empty_state, pagination as pagination_macro, status_badge %}
+
+{% block title %}我的预约 · 校园自习室预约系统{% endblock %}
+
+{% block content %}
+{% set page_obj = reservations if reservations is defined and reservations.items is defined else pagination %}
+<div class="container">
+  <div class="page-header">
+    <div>
+      <h1 class="page-header__title">我的预约</h1>
+      <p class="page-header__subtitle">查看预约记录与状态，在可操作时间内取消预约或完成签到。</p>
+    </div>
+    <div class="page-header__actions">
+      <a class="btn btn--primary" href="{{ url_for('student.home') }}#rooms">去预约座位</a>
+    </div>
+  </div>
+
+  <div class="stat-grid mb-3">
+    <div class="stat-card">
+      <p class="stat-card__label">有效预约</p>
+      <p class="stat-card__value">{{ stats.active }}</p>
+    </div>
+    <div class="stat-card">
+      <p class="stat-card__label">已签到</p>
+      <p class="stat-card__value">{{ stats.checked_in }}</p>
+    </div>
+    <div class="stat-card">
+      <p class="stat-card__label">已完成</p>
+      <p class="stat-card__value">{{ stats.completed }}</p>
+    </div>
+    <div class="stat-card">
+      <p class="stat-card__label">全部预约</p>
+      <p class="stat-card__value">{{ stats.total }}</p>
+    </div>
+  </div>
+
+  <section class="card" aria-labelledby="reservationListTitle">
+    <div class="card__header">
+      <div>
+        <h2 class="card__title" id="reservationListTitle">预约记录</h2>
+        <p class="card__subtitle">
+          共 {{ page_obj.total }} 条预约记录{% if selected_date or selected_status %}（已按筛选条件过滤）{% endif %}
+        </p>
+      </div>
+    </div>
+
+    <form class="filters" method="get" action="{{ url_for('student.my_reservations') }}">
+      <div class="filters__group">
+        <label class="filters__label" for="filterDate">预约日期</label>
+        <input class="form-control" type="date" id="filterDate" name="date" value="{{ selected_date }}"
+               {% if date_min %}min="{{ date_min.isoformat() }}"{% endif %}>
+      </div>
+      <div class="filters__group">
+        <label class="filters__label" for="filterStatus">预约状态</label>
+        <select class="form-select" id="filterStatus" name="status">
+          {% for value, label in status_options %}
+          <option value="{{ value }}"{% if value == selected_status %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="filters__actions">
+        <button class="btn btn--primary" type="submit">筛选</button>
+        <a class="btn btn--ghost" href="{{ url_for('student.my_reservations') }}">重置</a>
+      </div>
+    </form>
+
+    {% if page_obj.items %}
+    <div class="table-wrap">
+      <table class="table">
+        <caption class="sr-only">我的预约记录列表</caption>
+        <thead>
+          <tr>
+            <th scope="col">自习室 · 座位</th>
+            <th scope="col">预约日期</th>
+            <th scope="col">时间段</th>
+            <th scope="col">状态</th>
+            <th scope="col">创建时间</th>
+            <th scope="col">签到 / 取消信息</th>
+            <th scope="col">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in page_obj.items %}
+          <tr>
+            <td>
+              <a href="{{ url_for('student.room_detail', room_id=r.room.id) }}">{{ r.room.name }}</a>
+              <span class="muted small">· 座位 {{ r.seat.seat_code }}</span>
+              {% if r.is_demo %}<span class="badge badge--demo">示例</span>{% endif %}
+            </td>
+            <td class="nowrap">{{ r.date_display }}</td>
+            <td class="nowrap">{{ r.time_range_display }}</td>
+            <td>{{ status_badge(r.status) }}</td>
+            <td class="nowrap muted small">{{ r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else '—' }}</td>
+            <td>
+              {% if r.checked_in_at %}
+                <span class="text-success small">签到时间</span>
+                <span class="muted small">{{ r.checked_in_at.strftime('%Y-%m-%d %H:%M') }}</span>
+              {% elif r.cancellation_reason %}
+                <span class="muted small">取消原因：{{ r.cancellation_reason }}</span>
+              {% else %}
+                <span class="muted">—</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="flex gap-1">
+                {% if r.can_cancel() %}
+                <form method="post" action="{{ url_for('student.cancel_reservation', reservation_id=r.id) }}" data-confirm="确定要取消这条预约吗？取消后座位将被释放。">
+                  {{ csrf_field() }}
+                  <input type="hidden" name="reason" value="学生主动取消">
+                  <button type="submit" class="btn btn--danger btn--sm">取消预约</button>
+                </form>
+                {% endif %}
+                {% if r.can_check_in() %}
+                <form method="post" action="{{ url_for('student.check_in', reservation_id=r.id) }}">
+                  {{ csrf_field() }}
+                  <button type="submit" class="btn btn--secondary btn--sm">签到</button>
+                </form>
+                {% endif %}
+                {% if not r.can_cancel() and not r.can_check_in() %}
+                  <span class="muted small">—</span>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ pagination_macro(page_obj) }}
+    {% elif selected_date or selected_status %}
+      {{ empty_state("🔍", "没有符合筛选条件的预约", "可以调整日期或状态筛选，或清除筛选查看全部预约记录。", url_for('student.my_reservations'), "清除筛选") }}
+    {% else %}
+      {{ empty_state("📭", "还没有预约记录", "去首页选择自习室和座位，开始你的第一次预约。", url_for('student.home') ~ '#rooms', "去预约") }}
+    {% endif %}
+  </section>
+
+  <div class="alert alert--info mt-3" role="note">
+    <span class="alert__icon" aria-hidden="true">i</span>
+    <span class="alert__text">取消规则：预约开始前可取消，已开始或已结束的预约不可取消；签到窗口为预约开始前 15 分钟至开始后 30 分钟。</span>
+  </div>
+</div>
+{% endblock %}

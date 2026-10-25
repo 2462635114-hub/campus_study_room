@@ -1,0 +1,95 @@
+{% extends "admin/base.html" %}
+{% from "components/_macros.html" import empty_state, csrf_field %}
+
+{% block title %}自习室管理 · 校园自习室预约系统{% endblock %}
+{% block admin_title %}自习室管理{% endblock %}
+
+{% block admin_actions %}
+<a class="btn btn--primary btn--sm" href="{{ url_for('admin.room_new') }}">新增自习室</a>
+{% endblock %}
+
+{% block admin_content %}
+<div class="card">
+  <div class="card__header">
+    <div>
+      <h2 class="card__title">自习室列表</h2>
+      <p class="card__subtitle">
+        共 {{ stats.total }} 间自习室，其中启用中 {{ stats.active }} 间、已停用 {{ stats.disabled }} 间。
+        {% if demo_mode %}<span class="badge badge--demo">示例数据</span>{% endif %}
+      </p>
+    </div>
+  </div>
+
+  <form class="filters" method="get" action="{{ url_for('admin.rooms') }}" role="search">
+    <div class="filters__group">
+      <label class="filters__label" for="roomSearch">搜索自习室</label>
+      <input class="form-control" type="search" id="roomSearch" name="q" value="{{ q }}" placeholder="按名称或位置搜索">
+    </div>
+    <div class="filters__actions">
+      <button class="btn btn--primary btn--sm" type="submit">搜索</button>
+      {% if q %}<a class="btn btn--ghost btn--sm" href="{{ url_for('admin.rooms') }}">清除搜索</a>{% endif %}
+    </div>
+  </form>
+
+  <div class="card__body">
+    {% if rooms %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">名称</th>
+            <th scope="col">位置</th>
+            <th scope="col">开放时间</th>
+            <th scope="col">座位数（启用 / 全部）</th>
+            <th scope="col">当前有效预约</th>
+            <th scope="col">状态</th>
+            <th scope="col">示例数据</th>
+            <th scope="col">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in rooms %}
+          <tr>
+            <td><strong>{{ item.room.name }}</strong></td>
+            <td>{{ item.room.location or '—' }}</td>
+            <td class="nowrap">{{ item.room.opening_display }} – {{ item.room.closing_display }}</td>
+            <td class="nowrap">{{ item.seat_count }} / {{ item.total_seat_count }}</td>
+            <td>{{ item.active_reservations }}</td>
+            <td>
+              {% if item.room.is_active %}
+                <span class="badge badge--success">启用中</span>
+              {% else %}
+                <span class="badge badge--muted">已停用</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if item.room.is_demo %}
+                <span class="badge badge--demo">示例</span>
+              {% else %}
+                <span class="muted">—</span>
+              {% endif %}
+            </td>
+            <td class="table__actions">
+              <a class="btn btn--secondary btn--sm" href="{{ url_for('admin.room_edit', room_id=item.room.id) }}">编辑</a>
+              <a class="btn btn--secondary btn--sm" href="{{ url_for('admin.room_seats_page', room_id=item.room.id) }}">管理座位</a>
+              <form method="post" action="{{ url_for('admin.toggle_room', room_id=item.room.id) }}"
+                    {% if item.room.is_active %}data-confirm="确定要关闭自习室「{{ item.room.name }}」吗？关闭后学生将无法预约该自习室的座位，历史预约记录不会删除。"{% else %}data-confirm="确定要重新启用自习室「{{ item.room.name }}」吗？"{% endif %}>
+                {{ csrf_field() }}
+                <button class="btn btn--{{ 'danger' if item.room.is_active else 'primary' }} btn--sm" type="submit">
+                  {{ '关闭' if item.room.is_active else '启用' }}
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% elif q %}
+      {{ empty_state("🔍", "没有找到匹配的自习室", "没有名称或位置包含「" ~ q ~ "」的自习室，请尝试其他关键词。", url_for('admin.rooms'), "清除搜索") }}
+    {% else %}
+      {{ empty_state("🏫", "还没有自习室", "先创建一间自习室，再为它添加座位并开放预约。", url_for('admin.room_new'), "新增自习室") }}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

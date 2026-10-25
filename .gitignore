@@ -1,0 +1,53 @@
+# 字节码 / 缓存
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.cache/
+.ruff_cache/
+.mypy_cache/
+.pyre/
+*.pyd
+*.so
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# 环境变量（含密钥，禁止提交）
+.env
+.env.*
+!.env.example
+
+# 数据库文件（禁止提交开发数据库）
+instance/*.db
+instance/*.db-*
+instance/*.sqlite
+instance/*.sqlite-*
+instance/*.sqlite3
+instance/*.sqlite3-*
+*.db-journal
+
+# 构建产物 / 打包内容
+build/
+dist/
+sdist/
+*.egg-info/
+*.egg
+*.whl
+
+# 编辑器/IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# 日志与导出文件
+*.log
+logs/
+exports/

@@ -1,0 +1,42 @@
+{% extends "admin/base.html" %}
+{% from "components/_macros.html" import render_field %}
+
+{% block title %}编辑座位 · {{ seat.seat_code }} · 校园自习室预约系统{% endblock %}
+{% block admin_title %}编辑座位 · {{ seat.seat_code }}{% endblock %}
+
+{% block admin_content %}
+<nav class="breadcrumb" aria-label="面包屑导航">
+  <a href="{{ url_for('admin.dashboard') }}">管理后台</a>
+  <span aria-hidden="true"> / </span>
+  <a href="{{ url_for('admin.rooms') }}">自习室管理</a>
+  <span aria-hidden="true"> / </span>
+  <a href="{{ url_for('admin.room_seats_page', room_id=room.id) }}">{{ room.name }} · 座位管理</a>
+  <span aria-hidden="true"> / </span>
+  <span aria-current="page">编辑座位</span>
+</nav>
+
+<div class="card">
+  <div class="card__header">
+    <div>
+      <h2 class="card__title">编辑座位「{{ seat.seat_code }}」</h2>
+      <p class="card__subtitle">所属自习室：{{ room.name }}{% if room.location %} · {{ room.location }}{% endif %}</p>
+    </div>
+  </div>
+  <div class="card__body">
+    <div class="alert alert--warning">
+      <span class="alert__icon" aria-hidden="true">!</span>
+      <span class="alert__text">修改座位编号会影响历史预约记录的展示，请谨慎操作。若该座位已有历史预约，建议保持原编号，仅调整启用状态。</span>
+    </div>
+
+    <form class="form" method="post" action="{{ url_for('admin.seat_edit', seat_id=seat.id) }}">
+      {{ form.hidden_tag() }}
+      {{ render_field(form.seat_code) }}
+      {{ render_field(form.is_active) }}
+      <div class="form-actions">
+        <button class="btn btn--primary" type="submit">保存修改</button>
+        <a class="btn btn--ghost" href="{{ url_for('admin.room_seats_page', room_id=room.id) }}">取消</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,155 @@
+{% extends "admin/base.html" %}
+{% from "components/_macros.html" import status_badge, empty_state, csrf_field %}
+{% from "components/_macros.html" import pagination as render_pagination %}
+
+{% block title %}预约管理 · 校园自习室预约系统{% endblock %}
+{% block admin_title %}预约管理{% endblock %}
+
+{% block admin_actions %}
+<a class="btn btn--secondary btn--sm"
+   href="{{ url_for('admin.export_reservations', date=filters.date or none, username=filters.username or none, room_id=filters.room_id or none, status=filters.status or none) }}">导出 CSV</a>
+<form method="post" action="{{ url_for('admin.sweep_reservations') }}"
+      data-confirm="确定要刷新预约状态吗？系统会将已结束的预约标记为已完成，把开始后未签到的预约标记为爽约，该操作会更新预约记录。">
+  {{ csrf_field() }}
+  <button class="btn btn--ghost btn--sm" type="submit">刷新预约状态</button>
+</form>
+{% endblock %}
+
+{% block admin_content %}
+{% set has_filters = filters.date or filters.username or filters.room_id or filters.status %}
+
+<section class="stat-grid" aria-label="预约状态统计">
+  <div class="stat-card">
+    <p class="stat-card__label">全部预约</p>
+    <p class="stat-card__value">{{ stats.total }}</p>
+    <p class="stat-card__hint">含全部状态</p>
+  </div>
+  <div class="stat-card">
+    <p class="stat-card__label">有效</p>
+    <p class="stat-card__value">{{ stats.active }}</p>
+    <p class="stat-card__hint">等待开始或进行中</p>
+  </div>
+  <div class="stat-card">
+    <p class="stat-card__label">已签到</p>
+    <p class="stat-card__value">{{ stats.checked_in }}</p>
+    <p class="stat-card__hint">已签到入场</p>
+  </div>
+  <div class="stat-card">
+    <p class="stat-card__label">已完成</p>
+    <p class="stat-card__value">{{ stats.completed }}</p>
+    <p class="stat-card__hint">正常结束</p>
+  </div>
+  <div class="stat-card">
+    <p class="stat-card__label">已取消</p>
+    <p class="stat-card__value">{{ stats.cancelled }}</p>
+    <p class="stat-card__hint">学生或管理员取消</p>
+  </div>
+  <div class="stat-card">
+    <p class="stat-card__label">爽约</p>
+    <p class="stat-card__value">{{ stats.no_show }}</p>
+    <p class="stat-card__hint">未在签到窗口内签到</p>
+  </div>
+</section>
+
+<div class="card">
+  <div class="card__header">
+    <div>
+      <h2 class="card__title">预约记录</h2>
+      <p class="card__subtitle">
+        {% if has_filters %}已应用筛选条件{% else %}全部预约记录{% endif %} · 共 {{ stats.total }} 条
+      </p>
+    </div>
+  </div>
+
+  <form class="filters" method="get" action="{{ url_for('admin.reservations') }}" role="search">
+    <div class="filters__group">
+      <label class="filters__label" for="filterDate">日期</label>
+      <input class="form-control" type="date" id="filterDate" name="date" value="{{ filters.date }}">
+    </div>
+    <div class="filters__group">
+      <label class="filters__label" for="filterUsername">学生用户名</label>
+      <input class="form-control" type="search" id="filterUsername" name="username" value="{{ filters.username }}" placeholder="输入用户名筛选">
+    </div>
+    <div class="filters__group">
+      <label class="filters__label" for="filterRoom">自习室</label>
+      <select class="form-select" id="filterRoom" name="room_id">
+        <option value="">全部自习室</option>
+        {% for room in rooms %}
+        <option value="{{ room.id }}"{% if filters.room_id|string == room.id|string %} selected{% endif %}>{{ room.name }}{% if not room.is_active %}（已停用）{% endif %}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filters__group">
+      <label class="filters__label" for="filterStatus">状态</label>
+      <select class="form-select" id="filterStatus" name="status">
+        {% for value, label in status_options %}
+        <option value="{{ value }}"{% if filters.status == value %} selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filters__actions">
+      <button class="btn btn--primary btn--sm" type="submit">筛选</button>
+      {% if has_filters %}<a class="btn btn--ghost btn--sm" href="{{ url_for('admin.reservations') }}">重置</a>{% endif %}
+    </div>
+  </form>
+
+  <div class="card__body">
+    {% if reservations.items %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">ID</th>
+            <th scope="col">学生</th>
+            <th scope="col">自习室 / 座位</th>
+            <th scope="col">日期</th>
+            <th scope="col">时间段</th>
+            <th scope="col">状态</th>
+            <th scope="col">签到时间</th>
+            <th scope="col">取消原因</th>
+            <th scope="col">创建时间</th>
+            <th scope="col">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for reservation in reservations.items %}
+          <tr>
+            <td class="nowrap">#{{ reservation.id }}</td>
+            <td>{{ reservation.user.username }}</td>
+            <td><strong>{{ reservation.room.name }}</strong> <span class="muted small">/ {{ reservation.seat.seat_code }}</span></td>
+            <td class="nowrap">{{ reservation.date_display }}</td>
+            <td class="nowrap">{{ reservation.time_range_display }}</td>
+            <td>{{ status_badge(reservation.status) }}</td>
+            <td class="nowrap">{{ reservation.checked_in_at.strftime('%Y-%m-%d %H:%M') if reservation.checked_in_at else '—' }}</td>
+            <td>{{ reservation.cancellation_reason or '—' }}</td>
+            <td class="nowrap">{{ reservation.created_at.strftime('%Y-%m-%d %H:%M') if reservation.created_at else '—' }}</td>
+            <td class="table__actions">
+              {% if reservation.status in ['active', 'checked_in'] %}
+              <details>
+                <summary class="btn btn--danger btn--sm">取消预约</summary>
+                <form class="mt-2" method="post" action="{{ url_for('admin.cancel_reservation', reservation_id=reservation.id) }}"
+                      data-confirm="确定要取消该预约吗？取消后该座位对应时段将被释放，操作不可撤销。">
+                  {{ csrf_field() }}
+                  <label class="sr-only" for="cancelReason-{{ reservation.id }}">取消原因</label>
+                  <input class="form-control" type="text" id="cancelReason-{{ reservation.id }}" name="cancellation_reason" placeholder="填写取消原因" required>
+                  <button class="btn btn--danger btn--sm mt-1" type="submit">确定取消</button>
+                </form>
+              </details>
+              {% else %}
+              <span class="muted small">不可取消</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ render_pagination(reservations) }}
+    {% elif has_filters %}
+      {{ empty_state("🔍", "没有符合条件的预约", "请调整日期、用户名、自习室或状态筛选条件后重试。", url_for('admin.reservations'), "重置筛选") }}
+    {% else %}
+      {{ empty_state("🗓️", "暂无预约记录", "学生提交预约后，预约记录会显示在这里。") }}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

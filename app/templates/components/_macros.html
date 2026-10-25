@@ -1,0 +1,85 @@
+{# 通用 Jinja 组件宏：所有页面共享，由 Lead 维护，页面编写者只调用不修改。 #}
+
+{% macro csrf_field() -%}
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+{%- endmacro %}
+
+{% macro render_field(field, extra_class="") -%}
+  {%- set widget = namespace(cls="form-control") -%}
+  {%- if field.type in ["SelectField", "SelectMultipleField"] -%}{%- set widget.cls = "form-select" -%}{%- endif -%}
+  {%- if field.type in ["TextAreaField"] -%}{%- set widget.cls = "form-textarea" -%}{%- endif -%}
+  {%- if field.type in ["BooleanField"] -%}{%- set widget.cls = "form-check__input" -%}{%- endif -%}
+  {%- if extra_class -%}{%- set widget.cls = widget.cls ~ " " ~ extra_class -%}{%- endif -%}
+  {%- if field.errors -%}{%- set widget.cls = widget.cls ~ " is-invalid" -%}{%- endif -%}
+  {%- if field.type == "BooleanField" %}
+  <div class="form-group form-group--check{% if field.errors %} form-group--error{% endif %}">
+    <label class="form-check">
+      {{ field(class=widget.cls) }}
+      <span>{{ field.label.text }}</span>
+    </label>
+    {% for error in field.errors %}<p class="form-error">{{ error }}</p>{% endfor %}
+    {% if field.description %}<p class="form-hint">{{ field.description }}</p>{% endif %}
+  </div>
+  {%- else %}
+  <div class="form-group{% if field.errors %} form-group--error{% endif %}">
+    {{ field.label(class="form-label") }}
+    {{ field(class=widget.cls) }}
+    {% for error in field.errors %}<p class="form-error">{{ error }}</p>{% endfor %}
+    {% if field.description %}<p class="form-hint">{{ field.description }}</p>{% endif %}
+  </div>
+  {%- endif %}
+{%- endmacro %}
+
+{% macro status_badge(status) -%}
+  {%- set labels = {"active": "有效", "checked_in": "已签到", "completed": "已完成", "cancelled": "已取消", "no_show": "爽约"} -%}
+  <span class="badge badge--{{ status }}">{{ labels.get(status, status) }}</span>
+{%- endmacro %}
+
+{% macro empty_state(icon, title, text="", action_url=None, action_label="") -%}
+  <div class="empty-state">
+    <div class="empty-state__icon" aria-hidden="true">{{ icon }}</div>
+    <h3 class="empty-state__title">{{ title }}</h3>
+    {% if text %}<p class="empty-state__text">{{ text }}</p>{% endif %}
+    {% if action_url and action_label %}
+      <div class="empty-state__actions"><a class="btn btn--primary btn--sm" href="{{ action_url }}">{{ action_label }}</a></div>
+    {% endif %}
+  </div>
+{%- endmacro %}
+
+{% macro pagination(pagination) -%}
+  {%- if pagination and pagination.pages > 1 %}
+  <nav class="pagination" aria-label="列表分页">
+    <span class="pagination__info">第 {{ pagination.page }} / {{ pagination.pages }} 页 · 共 {{ pagination.total }} 条</span>
+    {% if pagination.has_prev %}
+      <a class="pagination__link" href="{{ page_url(pagination.prev_num) }}" rel="prev">上一页</a>
+    {% else %}
+      <span class="pagination__link pagination__link--disabled" aria-disabled="true">上一页</span>
+    {% endif %}
+    {% for p in pagination.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1) %}
+      {% if p %}
+        {% if p == pagination.page %}
+          <span class="pagination__link pagination__link--active" aria-current="page">{{ p }}</span>
+        {% else %}
+          <a class="pagination__link" href="{{ page_url(p) }}">{{ p }}</a>
+        {% endif %}
+      {% else %}
+        <span class="pagination__ellipsis" aria-hidden="true">…</span>
+      {% endif %}
+    {% endfor %}
+    {% if pagination.has_next %}
+      <a class="pagination__link" href="{{ page_url(pagination.next_num) }}" rel="next">下一页</a>
+    {% else %}
+      <span class="pagination__link pagination__link--disabled" aria-disabled="true">下一页</span>
+    {% endif %}
+  </nav>
+  {%- endif %}
+{%- endmacro %}
+
+{% macro seat_legend() -%}
+  <ul class="seat-legend" aria-label="座位状态图例">
+    <li class="seat-legend__item"><span class="seat-legend__swatch seat-legend__swatch--free" aria-hidden="true"></span>空闲</li>
+    <li class="seat-legend__item"><span class="seat-legend__swatch seat-legend__swatch--taken" aria-hidden="true"></span>已预约</li>
+    <li class="seat-legend__item"><span class="seat-legend__swatch seat-legend__swatch--mine" aria-hidden="true"></span>我已预约</li>
+    <li class="seat-legend__item"><span class="seat-legend__swatch seat-legend__swatch--disabled" aria-hidden="true"></span>不可用</li>
+  </ul>
+{%- endmacro %}

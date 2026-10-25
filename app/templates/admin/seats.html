@@ -1,0 +1,119 @@
+{% extends "admin/base.html" %}
+{% from "components/_macros.html" import render_field, csrf_field, empty_state %}
+
+{% block title %}座位管理 · {{ room.name }} · 校园自习室预约系统{% endblock %}
+{% block admin_title %}座位管理{% endblock %}
+
+{% block admin_actions %}
+<a class="btn btn--secondary btn--sm" href="{{ url_for('admin.room_edit', room_id=room.id) }}">编辑自习室</a>
+<a class="btn btn--ghost btn--sm" href="{{ url_for('admin.rooms') }}">返回自习室列表</a>
+{% endblock %}
+
+{% block admin_content %}
+<nav class="breadcrumb" aria-label="面包屑导航">
+  <a href="{{ url_for('admin.dashboard') }}">管理后台</a>
+  <span aria-hidden="true"> / </span>
+  <a href="{{ url_for('admin.rooms') }}">自习室管理</a>
+  <span aria-hidden="true"> / </span>
+  <a href="{{ url_for('admin.room_edit', room_id=room.id) }}">{{ room.name }}</a>
+  <span aria-hidden="true"> / </span>
+  <span aria-current="page">座位管理</span>
+</nav>
+
+<div class="page-header">
+  <div>
+    <h2 class="page-header__title">{{ room.name }}</h2>
+    <p class="page-header__subtitle">
+      {{ room.location or '未填写位置' }} · 开放时间 {{ room.opening_display }} – {{ room.closing_display }} · 在用座位 {{ room.seat_count }} / 全部 {{ room.total_seat_count }}
+      {% if room.is_demo %}<span class="badge badge--demo">示例数据</span>{% endif %}
+    </p>
+  </div>
+</div>
+
+{% if not room.is_active %}
+<div class="alert alert--warning">
+  <span class="alert__icon" aria-hidden="true">!</span>
+  <span class="alert__text">该自习室当前已停用，学生无法预约其座位；仍可在这里维护座位信息。</span>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card__header">
+    <div>
+      <h2 class="card__title">新增座位</h2>
+      <p class="card__subtitle">座位编号建议使用「区域-序号」格式，例如 A-01、B-12，编号需在自习室内唯一。</p>
+    </div>
+  </div>
+  <div class="card__body">
+    <form class="form" method="post" action="{{ url_for('admin.seat_new', room_id=room.id) }}">
+      {{ new_seat_form.hidden_tag() }}
+      <div class="form-grid form-grid--2">
+        {{ render_field(new_seat_form.seat_code) }}
+        {{ render_field(new_seat_form.is_active) }}
+      </div>
+      <div class="form-actions">
+        <button class="btn btn--primary" type="submit">添加座位</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card__header">
+    <div>
+      <h2 class="card__title">座位列表</h2>
+      <p class="card__subtitle">共 {{ seats|length }} 个座位</p>
+    </div>
+  </div>
+  <div class="card__body">
+    {% if seats %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">座位编号</th>
+            <th scope="col">状态</th>
+            <th scope="col">历史预约数</th>
+            <th scope="col">当前有效预约</th>
+            <th scope="col">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in seats %}
+          <tr>
+            <td><strong>{{ item.seat.seat_code }}</strong></td>
+            <td>
+              {% if item.seat.is_active %}
+                <span class="badge badge--success">启用中</span>
+              {% else %}
+                <span class="badge badge--muted">已停用</span>
+              {% endif %}
+            </td>
+            <td>{{ item.reservation_count }}</td>
+            <td>{{ item.active_reservations }}</td>
+            <td class="table__actions">
+              <div class="flex gap-1">
+                <a class="btn btn--secondary btn--sm" href="{{ url_for('admin.seat_edit', seat_id=item.seat.id) }}">编辑</a>
+                <form method="post" action="{{ url_for('admin.toggle_seat', seat_id=item.seat.id) }}"
+                      {% if item.seat.is_active %}data-confirm="确定要停用座位「{{ item.seat.seat_code }}」吗？停用后学生将无法预约该座位，历史预约记录不会删除。"{% else %}data-confirm="确定要重新启用座位「{{ item.seat.seat_code }}」吗？"{% endif %}>
+                  {{ csrf_field() }}
+                  <button class="btn btn--{{ 'danger' if item.seat.is_active else 'primary' }} btn--sm" type="submit">
+                    {{ '停用' if item.seat.is_active else '启用' }}
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      {{ empty_state("🪑", "还没有座位", "使用上方的「新增座位」表单为这间自习室添加第一个座位。") }}
+    {% endif %}
+  </div>
+  <div class="card__footer">
+    <p class="muted small">说明：存在历史预约的座位不允许删除，只能停用。停用后该座位不再出现在学生端预约页面，但历史预约记录仍会保留。</p>
+  </div>
+</div>
+{% endblock %}
